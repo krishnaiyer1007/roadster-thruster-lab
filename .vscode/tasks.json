@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "Web: serve on localhost:8080", "type": "shell", "command": "npm start", "isBackground": true, "problemMatcher": [] },
+    { "label": "Web: test physics", "type": "shell", "command": "npm test", "group": "test", "problemMatcher": [] },
+    { "label": "MATLAB: build, simulate and plot", "type": "shell",
+      "command": "/Applications/MATLAB_R2025b.app/bin/matlab -batch \"cd matlab; run_all('rebuild')\"",
+      "group": { "kind": "build", "isDefault": true }, "problemMatcher": [] },
+    { "label": "MATLAB: open the jump model in Simulink", "type": "shell",
+      "command": "open matlab/models/RoadsterJump.slx", "problemMatcher": [] }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "roadster-thruster-lab",
+  "version": "1.0.0",
+  "description": "Interactive physics model and MATLAB/Simulink model of the 2026 Tesla Roadster cold-gas thruster system",
+  "private": true,
+  "scripts": {
+    "test": "node --test web/physics.test.js",
+    "start": "python3 -m http.server 8080 --directory web"
+  },
+  "license": "MIT"
+}

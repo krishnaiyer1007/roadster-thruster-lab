@@ -1,0 +1,9 @@
+.DS_Store
+node_modules/
+# MATLAB / Simulink build artefacts
+slprj/
+*.slxc
+*.asv
+*.mexmaca64
+*.autosave
+matlab/codegen/

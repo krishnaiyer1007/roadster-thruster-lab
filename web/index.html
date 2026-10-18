@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Roadster Thruster Lab</title>
+<meta name="description" content="Interactive physics model of the 2026 Tesla Roadster's SpaceX cold-gas thruster system: launch, jump, hover, upside-down suction and recharge.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: test-cell console. Title block and shared vehicle setup, then one scenario at a time:
+   a wide stage canvas beside an instrument panel, charts underneath, explanation last. */
+:root{
+  --bg:#E6EBEE; --panel:#F6F8F9; --ink:#122029; --muted:#53646F; --line:#C4CED5;
+  --frost:#1A6FAD; --frost-soft:rgba(26,111,173,.12); --amber:#B9620F; --good:#1F7A4A; --bad:#B3322A;
+  --sky1:#D6E0E7; --sky2:#EDF1F3; --ground:#8E9CA6; --car:#FBFCFD; --glass:#2A3D4A; --obs:#B5C1C9; --obs-ink:#3F515D;
+  --f-display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D141A; --panel:#131D25; --ink:#E1E8ED; --muted:#8B9CA8; --line:#24323D;
+  --frost:#6CC2EE; --frost-soft:rgba(108,194,238,.14); --amber:#F0A04A; --good:#4CC58A; --bad:#F2695E;
+  --sky1:#0A1117; --sky2:#122029; --ground:#3A4954; --car:#DCE5EB; --glass:#1B2A35; --obs:#28363F; --obs-ink:#9FB0BB;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D141A; --panel:#131D25; --ink:#E1E8ED; --muted:#8B9CA8; --line:#24323D;
+  --frost:#6CC2EE; --frost-soft:rgba(108,194,238,.14); --amber:#F0A04A; --good:#4CC58A; --bad:#F2695E;
+  --sky1:#0A1117; --sky2:#122029; --ground:#3A4954; --car:#DCE5EB; --glass:#1B2A35; --obs:#28363F; --obs-ink:#9FB0BB;
+  color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 48px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr);gap:26px}
+.wrap>*,.scene>*{min-width:0}
+a{color:var(--frost)}
+:focus-visible{outline:2px solid var(--frost);outline-offset:2px}
+.mono{font-family:var(--f-mono)}
+.kicker{font-family:var(--f-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+header{display:grid;gap:12px}
+h1{font-family:var(--f-display);font-weight:800;font-size:clamp(44px,8vw,88px);line-height:.88;letter-spacing:.005em;text-transform:uppercase;margin:0;text-wrap:balance}
+h1 span{color:var(--frost)}
+.lede{max-width:66ch;margin:0;font-size:17px;color:var(--ink)}
+.specs{display:flex;flex-wrap:wrap;gap:8px;padding:0;margin:4px 0 0;list-style:none}
+.specs li{font-family:var(--f-mono);font-size:12px;border:1px solid var(--line);border-radius:3px;padding:3px 8px;color:var(--muted)}
+.specs li b{color:var(--ink);font-weight:500}
+
+.setup{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) minmax(0,1.3fr);gap:18px 24px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding-block:16px}
+.setup .derived{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 16px;align-content:start}
+@media (max-width:900px){.setup{grid-template-columns:repeat(2,minmax(0,1fr))}.setup .derived{grid-column:1/-1}}
+@media (max-width:520px){.setup{grid-template-columns:minmax(0,1fr)}}
+
+.ctl{display:grid;gap:4px}
+.ctl label{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--muted)}
+.ctl output{font-family:var(--f-mono);color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ctl small{font-size:11.5px;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--frost);margin:2px 0}
+
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:13px;border-bottom:1px dashed var(--line);padding-block:3px}
+.kv span{color:var(--muted)}
+.kv b{font-family:var(--f-mono);font-weight:500;font-variant-numeric:tabular-nums;text-align:right}
+
+nav.tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:thin}
+nav.tabs button{font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:.03em;text-transform:uppercase;background:none;border:0;color:var(--muted);padding:6px 14px 8px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+nav.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--frost)}
+nav.tabs button:hover{color:var(--ink)}
+
+.scene{display:grid;gap:18px}
+.scene-top{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
+@media (max-width:880px){.scene-top{grid-template-columns:minmax(0,1fr)}}
+.stage{display:grid;gap:8px;min-width:0}
+.canvas-box{border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--sky2);position:relative}
+canvas{display:block;width:100%}
+.caption{font-size:13px;color:var(--muted);margin:0;max-width:80ch}
+.runbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{font-family:var(--f-body);font-weight:600;font-size:14px;border-radius:4px;border:1px solid var(--frost);background:var(--frost);color:var(--bg);padding:7px 14px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn[aria-pressed=true]{background:var(--frost-soft);color:var(--ink);border-color:var(--frost)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.seg button{font-family:var(--f-mono);font-size:12px;background:none;border:0;color:var(--muted);padding:7px 10px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--frost-soft);color:var(--ink)}
+
+.panel{display:grid;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px}
+.panel h3{margin:0;font-family:var(--f-mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.status{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:13px;font-weight:500;padding:5px 10px;border-radius:3px;border:1px solid currentColor;justify-self:start}
+.status::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.status.good{color:var(--good)} .status.bad{color:var(--bad)} .status.warn{color:var(--amber)}
+
+.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+@media (max-width:760px){.charts{grid-template-columns:minmax(0,1fr)}}
+.chart{display:grid;gap:6px;min-width:0}
+.chart h4{margin:0;font-size:13px;font-weight:600}
+.chart .canvas-box{background:var(--panel)}
+
+.explain{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 32px}
+@media (max-width:760px){.explain{grid-template-columns:minmax(0,1fr)}}
+.explain h3{font-family:var(--f-display);font-weight:700;font-size:24px;text-transform:uppercase;letter-spacing:.02em;margin:0 0 4px}
+.explain p{margin:0 0 10px;max-width:64ch}
+.eq{font-family:var(--f-mono);font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:8px 10px;margin:6px 0 10px;overflow-x:auto;white-space:nowrap}
+
+.diagram{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--panel);padding:10px}
+.diagram svg{display:block;min-width:760px;width:100%;height:auto}
+.diagram .box{fill:var(--bg);stroke:var(--line);stroke-width:1.2}
+.diagram .hot{fill:var(--frost-soft);stroke:var(--frost);stroke-width:1.5}
+.diagram text{fill:var(--ink);font-family:var(--f-body);font-size:13px}
+.diagram .sub{fill:var(--muted);font-family:var(--f-mono);font-size:11px}
+.diagram .flow{stroke:var(--frost);stroke-width:2;fill:none}
+.diagram .pow{stroke:var(--amber);stroke-width:2;fill:none;stroke-dasharray:5 4}
+.diagram .ah{fill:var(--frost)} .diagram .ahp{fill:var(--amber)}
+
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tag{font-family:var(--f-mono);font-size:11px;padding:1px 6px;border-radius:3px;border:1px solid currentColor;white-space:nowrap}
+.tag.k{color:var(--good)} .tag.a{color:var(--amber)}
+
+footer{border-top:1px solid var(--line);padding-top:16px;font-size:13px;color:var(--muted);display:grid;gap:8px}
+footer ul{margin:0;padding-left:18px}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="kicker">Tesla Roadster · SpaceX cold-gas package · revealed 15 Oct 2026</div>
+    <h1>Roadster <span>Thruster</span> Lab</h1>
+    <p class="lede">An interactive physics model of how the new Roadster launches, jumps, hovers and drives upside down. Tesla's published figures where they exist, clearly labelled engineering assumptions where they don't. Change the setup and every scenario re-runs.</p>
+    <ul class="specs">
+      <li><b>10</b> thrusters</li><li><b>600 L</b> air tank</li><li>rechargeable compressed air</li><li>rear suction fans</li><li>0-60 mph <b>&lt; 1 s</b> claimed</li><li>production <b>2028</b></li>
+    </ul>
+  </header>
+
+  <section class="setup" aria-label="Vehicle setup">
+    <div class="ctl"><label for="g-p0">Tank pressure <output id="o-p0"></output></label><input id="g-p0" type="range" min="200" max="700" step="10" value="310"><small>Assumed. Not published by Tesla.</small></div>
+    <div class="ctl"><label for="g-mass">Car mass, empty tank <output id="o-mass"></output></label><input id="g-mass" type="range" min="1500" max="2400" step="25" value="1900"><small>Assumed. Air in the tank is added on top.</small></div>
+    <div class="ctl"><label for="g-reg">Nozzle feed pressure <output id="o-reg"></output></label><input id="g-reg" type="range" min="60" max="150" step="5" value="100"><small>Regulator setting. Thrust drops once the tank falls below it.</small></div>
+    <div class="derived" id="derived"></div>
+  </section>
+
+  <nav class="tabs" role="tablist" aria-label="Scenarios">
+    <button role="tab" id="t-jump" aria-controls="s-jump" aria-selected="true">Jump</button>
+    <button role="tab" id="t-launch" aria-controls="s-launch" aria-selected="false">Launch</button>
+    <button role="tab" id="t-hover" aria-controls="s-hover" aria-selected="false">Hover</button>
+    <button role="tab" id="t-upside" aria-controls="s-upside" aria-selected="false">Upside down</button>
+    <button role="tab" id="t-recharge" aria-controls="s-recharge" aria-selected="false">Recharge</button>
+    <button role="tab" id="t-system" aria-controls="s-system" aria-selected="false">How it works</button>
+  </nav>
+
+  <!-- JUMP -->
+  <section class="scene" id="s-jump" role="tabpanel" aria-labelledby="t-jump">
+    <div class="scene-top">
+      <div class="stage">
+        <div class="canvas-box"><canvas id="cv-jump" aria-label="Side view of the Roadster jumping a row of five vehicles"></canvas></div>
+        <div class="runbar">
+          <button class="btn" id="run-jump">Run jump</button>
+          <div class="seg" role="group" aria-label="Playback speed"><button data-speed="1" aria-pressed="false">1×</button><button data-speed="0.35" aria-pressed="true">0.35×</button><button data-speed="0.15" aria-pressed="false">0.15×</button></div>
+          <div class="seg" role="group" aria-label="Manoeuvre"><button id="j-level" aria-pressed="true">Level jump</button><button id="j-spin" aria-pressed="false">360° flip</button></div>
+        </div>
+        <p class="caption">At the reveal the car cleared five vehicles in a row, the tallest a Semi tractor. Silhouettes use typical sizes for each vehicle type. The dashed line is the planned path of the car's centre of mass.</p>
+      </div>
+      <aside class="panel" aria-label="Jump controls and results">
+        <span class="status" id="j-status">…</span>
+        <div class="ctl"><label for="j-v0">Approach speed <output id="o-v0"></output></label><input id="j-v0" type="range" min="10" max="34" step="1" value="22"></div>
+        <div class="ctl"><label for="j-lift">Lift thrust, each of 4 <output id="o-lift"></output></label><input id="j-lift" type="range" min="6" max="20" step="0.5" value="13"></div>
+        <div class="ctl"><label for="j-burn">Lift burn time <output id="o-burn"></output></label><input id="j-burn" type="range" min="0.2" max="1.2" step="0.05" value="0.5"></div>
+        <div class="ctl"><label for="j-att">Attitude thrust, each of 4 <output id="o-att"></output></label><input id="j-att" type="range" min="2" max="20" step="0.5" value="5"></div>
+        <h3>Results</h3>
+        <div id="j-ro"></div>
+      </aside>
+    </div>
+    <div class="charts">
+      <div class="chart"><h4>Thrust by nozzle group</h4><div class="canvas-box"><canvas id="ch-jump-f"></canvas></div></div>
+      <div class="chart"><h4>Tank pressure during the jump</h4><div class="canvas-box"><canvas id="ch-jump-p"></canvas></div></div>
+    </div>
+    <div class="explain">
+      <div><h3>What happens</h3><p>The car drives at the row, then four underbody nozzles fire straight down for about half a second. That kicks it upward at roughly 1.5 g on top of gravity. After the burn it is a projectile: it rises, peaks and falls. Just before touchdown the same nozzles fire again as a landing burn, the same trick a Falcon 9 booster uses, so the suspension sees a 1 m/s landing instead of 8 m/s.</p></div>
+      <div><h3>Staying level</h3><p>Four attitude nozzles at the corners push the nose up or down. A feedback controller compares the car's pitch with the target and fires the right pair, the electric "micro adjustments" Tesla described. Try the 360° flip: the corner nozzles can't turn a two-tonne car fast enough without a bigger burn, and the landing burn then runs short of pressure.</p>
+      <div class="eq">τ = I·(θ̈ref + Kp·(θref − θ) + Kd·(θ̇ref − θ̇)),  |τ| ≤ 2·F_att·arm</div></div>
+    </div>
+  </section>
+
+  <!-- LAUNCH -->
+  <section class="scene" id="s-launch" role="tabpanel" aria-labelledby="t-launch" hidden>
+    <div class="scene-top">
+      <div class="stage">
+        <div class="canvas-box"><canvas id="cv-launch" aria-label="Three cars launching from 0 to 60 mph"></canvas></div>
+        <div class="runbar">
+          <button class="btn" id="run-launch">Run launch</button>
+          <div class="seg" role="group" aria-label="Playback speed"><button data-speed="1" aria-pressed="false">1×</button><button data-speed="0.35" aria-pressed="true">0.35×</button><button data-speed="0.15" aria-pressed="false">0.15×</button></div>
+        </div>
+        <p class="caption">Three identical cars, 0 to 60 mph. Each lane ends where that car reaches 60 mph.</p>
+      </div>
+      <aside class="panel" aria-label="Launch controls and results">
+        <div class="ctl"><label for="l-rear">Rear thrust, each of 2 <output id="o-rear"></output></label><input id="l-rear" type="range" min="0" max="25" step="0.5" value="13"></div>
+        <div class="ctl"><label for="l-fan">Fan suction <output id="o-fan"></output></label><input id="l-fan" type="range" min="0" max="12" step="0.5" value="6"></div>
+        <div class="ctl"><label for="l-mu">Tyre grip coefficient <output id="o-mu"></output></label><input id="l-mu" type="range" min="0.9" max="1.7" step="0.05" value="1.3"></div>
+        <div class="ctl"><label for="l-pow">Motor power <output id="o-pow"></output></label><input id="l-pow" type="range" min="500" max="1500" step="25" value="950"></div>
+        <h3>Results</h3>
+        <div id="l-ro"></div>
+      </aside>
+    </div>
+    <div class="charts">
+      <div class="chart"><h4>Speed against time</h4><div class="canvas-box"><canvas id="ch-launch-v"></canvas></div></div>
+      <div class="chart"><h4>Where the push comes from at 30 mph</h4><div class="canvas-box"><canvas id="ch-launch-b"></canvas></div></div>
+    </div>
+    <div class="explain">
+      <div><h3>Why tyres hit a wall</h3><p>A tyre can only push as hard as it is pressed into the road, about 1.3 times the car's weight for sticky rubber. That caps a normal car near 1.3 g, which is roughly 2 seconds to 60 mph no matter how much motor power you add.</p><div class="eq">F_tyre ≤ μ·(m·g + Δp·A_fan)</div></div>
+      <div><h3>Two ways round it</h3><p>The suction fans pull the car into the tarmac, adding grip without adding mass. The rear thrusters skip the tyres entirely: they push on the air they throw backwards. Together they take the model under one second, in line with Tesla's claim for the Thrust trim.</p><div class="eq">a = (F_tyre + F_thrust − ½ρC_dA·v² − C_rr·N) / m</div></div>
+    </div>
+  </section>
+
+  <!-- HOVER -->
+  <section class="scene" id="s-hover" role="tabpanel" aria-labelledby="t-hover" hidden>
+    <div class="scene-top">
+      <div class="stage">
+        <div class="canvas-box"><canvas id="cv-hover" aria-label="The Roadster hovering on its lift thrusters with a tank gauge"></canvas></div>
+        <div class="runbar">
+          <button class="btn" id="run-hover">Run hover</button>
+          <div class="seg" role="group" aria-label="Playback speed"><button data-speed="1" aria-pressed="true">1×</button><button data-speed="0.5" aria-pressed="false">0.5×</button></div>
+        </div>
+        <p class="caption">The controller climbs to the target height, holds, and starts a controlled descent once the tank nears the regulator pressure, keeping air in reserve to land.</p>
+      </div>
+      <aside class="panel" aria-label="Hover controls and results">
+        <div class="ctl"><label for="h-alt">Target height <output id="o-alt"></output></label><input id="h-alt" type="range" min="0.3" max="3" step="0.1" value="1.5"></div>
+        <div class="ctl"><label for="h-lift">Lift thrust, each of 4 <output id="o-hlift"></output></label><input id="h-lift" type="range" min="6" max="20" step="0.5" value="13"></div>
+        <h3>Results</h3>
+        <div id="h-ro"></div>
+      </aside>
+    </div>
+    <div class="charts">
+      <div class="chart"><h4>Tank pressure against the regulator</h4><div class="canvas-box"><canvas id="ch-hover-p"></canvas></div></div>
+      <div class="chart"><h4>Thrust against weight</h4><div class="canvas-box"><canvas id="ch-hover-f"></canvas></div></div>
+    </div>
+    <div class="explain">
+      <div><h3>Why hover is short</h3><p>Holding a two-tonne car up takes about 21 kN. A cold-gas nozzle on air gets about 67 seconds of specific impulse, so it has to throw away roughly 30 kg of air every second. A 600 L tank at 310 bar holds about 200 kg, and only part of that comes out above the regulator pressure.</p><div class="eq">ṁ = F / (I_sp · g₀) ≈ 20,600 / (67 × 9.81) ≈ 31 kg/s</div></div>
+      <div><h3>The tank gets very cold</h3><p>As gas leaves, the gas left behind expands and cools. Modelled as adiabatic (no heat from the tank walls, the worst case), it falls far below freezing, and colder gas gives less thrust per kilogram. Real tanks warm the gas a little, so treat the hover time here as a floor.</p><div class="eq">p = p₀·(m/m₀)^γ,  T = T₀·(m/m₀)^(γ−1)</div></div>
+    </div>
+  </section>
+
+  <!-- UPSIDE DOWN -->
+  <section class="scene" id="s-upside" role="tabpanel" aria-labelledby="t-upside" hidden>
+    <div class="scene-top">
+      <div class="stage">
+        <div class="canvas-box"><canvas id="cv-upside" aria-label="The Roadster held to a tilted surface by fan suction, with force arrows"></canvas></div>
+        <p class="caption">Drag the angle to 180° to put the car on a ceiling, like the inverted ramp at the reveal. Arrows are drawn to scale.</p>
+      </div>
+      <aside class="panel" aria-label="Suction controls and results">
+        <span class="status" id="u-status">…</span>
+        <div class="ctl"><label for="u-ang">Surface angle <output id="o-ang"></output></label><input id="u-ang" type="range" min="0" max="180" step="1" value="180"></div>
+        <div class="ctl"><label for="u-dp">Underbody suction <output id="o-dp"></output></label><input id="u-dp" type="range" min="0" max="15" step="0.25" value="8"></div>
+        <div class="ctl"><label for="u-gap">Skirt gap to surface <output id="o-gap"></output></label><input id="u-gap" type="range" min="1" max="15" step="0.5" value="5"></div>
+        <h3>Results</h3>
+        <div id="u-ro"></div>
+      </aside>
+    </div>
+    <div class="charts">
+      <div class="chart"><h4>Grip available against grip needed, by angle</h4><div class="canvas-box"><canvas id="ch-up-a"></canvas></div></div>
+      <div class="chart"><h4>Fan power against suction</h4><div class="canvas-box"><canvas id="ch-up-p"></canvas></div></div>
+    </div>
+    <div class="explain">
+      <div><h3>The fan is the trick</h3><p>Fans in the rear diffuser pull air out from under the car. With the underbody sealed by a narrow skirt gap, a pressure drop of 8 kPa over 3 m² gives 24 kN of suction, a bit more than the car's weight. On a ceiling that leaves a few kN pressing the tyres on, enough to hold.</p><div class="eq">F_suction = Δp · A,  holds if  N = F_suction + W·cos θ > 0  and  μN ≥ W·|sin θ|</div></div>
+      <div><h3>Where it is hardest</h3><p>Upside down is not the worst angle. Around 130° to 150° the car's weight both pulls it away from the surface and tries to slide it, so grip runs out first there. The fans also pay for every millimetre of gap: leakage, and so power, rises with the gap and with the square root of the suction.</p><div class="eq">Q = C_d · gap · perimeter · √(2Δp/ρ),  P_fan = Q·Δp / η</div></div>
+    </div>
+  </section>
+
+  <!-- RECHARGE -->
+  <section class="scene" id="s-recharge" role="tabpanel" aria-labelledby="t-recharge" hidden>
+    <div class="scene-top">
+      <div class="stage">
+        <div class="canvas-box"><canvas id="cv-recharge" aria-label="Energy and range cost of refilling the air tank"></canvas></div>
+        <p class="caption">Tesla says the tank is rechargeable. Refilling it with an onboard compressor costs battery energy, shown here as equivalent driving range.</p>
+      </div>
+      <aside class="panel" aria-label="Recharge controls and results">
+        <div class="ctl"><label for="r-spec">Compressor energy per m³ of free air <output id="o-spec"></output></label><input id="r-spec" type="range" min="0.16" max="0.5" step="0.01" value="0.35"><small>0.16 is the theoretical minimum at 310 bar. Real high-pressure compressors use about 0.3 to 0.45.</small></div>
+        <div class="ctl"><label for="r-comp">Compressor power <output id="o-comp"></output></label><input id="r-comp" type="range" min="5" max="60" step="1" value="20"></div>
+        <div class="ctl"><label for="r-eff">Driving consumption <output id="o-eff"></output></label><input id="r-eff" type="range" min="250" max="450" step="5" value="330"></div>
+        <h3>Results</h3>
+        <div id="r-ro"></div>
+      </aside>
+    </div>
+    <div class="explain">
+      <div><h3>Squeezing air costs energy</h3><p>Filling the tank means taking about 160 m³ of ordinary air and squeezing it into 600 litres. Even a perfect compressor needs the isothermal work below; real multi-stage compressors lose a lot more as heat. That energy comes from the same battery that drives the wheels.</p><div class="eq">W_min = m·R·T·ln(p₀ / p_atm)</div></div>
+      <div><h3>What it means on the road</h3><p>A single launch is cheap. A jump with a landing burn uses around half the tank. Holding to a few showpiece moves per drive, with a slow top-up while cruising, is the realistic way to live with it.</p></div>
+    </div>
+  </section>
+
+  <!-- SYSTEM -->
+  <section class="scene" id="s-system" role="tabpanel" aria-labelledby="t-system" hidden>
+    <div class="diagram" role="img" aria-label="System diagram: battery powers a compressor that fills the 600 litre tank; air flows through a regulator and manifold to rear, lift and attitude nozzles; rear fans create underbody suction">
+      <svg viewBox="0 0 900 330" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="af" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0,0L10,5L0,10z"/></marker>
+          <marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ahp" d="M0,0L10,5L0,10z"/></marker>
+        </defs>
+        <rect class="box" x="20" y="40" width="140" height="64" rx="5"/><text x="34" y="66">Battery pack</text><text class="sub" x="34" y="86">powers everything</text>
+        <rect class="box" x="210" y="40" width="150" height="64" rx="5"/><text x="224" y="66">Electric compressor</text><text class="sub" x="224" y="86">refills the tank</text>
+        <rect class="hot" x="410" y="22" width="170" height="100" rx="44"/><text x="440" y="62">Composite tank</text><text class="sub" x="440" y="82">600 L · ~310 bar*</text><text class="sub" x="440" y="100">~197 kg of air*</text>
+        <rect class="box" x="630" y="40" width="120" height="64" rx="5"/><text x="644" y="66">Regulator</text><text class="sub" x="644" y="86">~100 bar feed*</text>
+        <rect class="box" x="630" y="160" width="120" height="56" rx="5"/><text x="644" y="184">Valve manifold</text><text class="sub" x="644" y="202">electric actuators</text>
+        <rect class="hot" x="790" y="120" width="96" height="44" rx="5"/><text x="802" y="140">2 × rear</text><text class="sub" x="802" y="156">launch</text>
+        <rect class="hot" x="790" y="182" width="96" height="44" rx="5"/><text x="802" y="202">4 × lift</text><text class="sub" x="802" y="218">jump, hover</text>
+        <rect class="hot" x="790" y="244" width="96" height="44" rx="5"/><text x="802" y="264">4 × attitude</text><text class="sub" x="802" y="280">pitch, roll</text>
+        <rect class="box" x="210" y="230" width="150" height="64" rx="5"/><text x="224" y="256">Rear diffuser fans</text><text class="sub" x="224" y="276">suck air from under</text>
+        <rect class="box" x="410" y="230" width="170" height="64" rx="5"/><text x="424" y="256">Sealed underbody</text><text class="sub" x="424" y="276">Δp × 3 m² = suction</text>
+        <path class="pow" d="M160,72 H206" marker-end="url(#ap)"/>
+        <path class="pow" d="M90,104 V262 H206" marker-end="url(#ap)"/>
+        <path class="flow" d="M360,72 H406" marker-end="url(#af)"/>
+        <path class="flow" d="M580,72 H626" marker-end="url(#af)"/>
+        <path class="flow" d="M690,104 V156" marker-end="url(#af)"/>
+        <path class="flow" d="M750,180 H770 V142 H786" marker-end="url(#af)"/>
+        <path class="flow" d="M750,190 H786" marker-end="url(#af)"/>
+        <path class="flow" d="M750,200 H770 V266 H786" marker-end="url(#af)"/>
+        <path class="flow" d="M406,262 H364" marker-end="url(#af)"/>
+        <text class="sub" x="20" y="320">Solid blue: air. Dashed amber: electric power. * modelled values, not published by Tesla.</text>
+      </svg>
+    </div>
+    <div class="explain">
+      <div><h3>Cold gas, not a rocket engine</h3><p>Nothing burns. The tank stores air at very high pressure; open a valve and it rushes out through a shaped nozzle, faster than sound, and the car is pushed the other way. It is the same kind of thruster SpaceX uses to steer Falcon 9 boosters, only fed with air instead of nitrogen.</p>
+        <div class="eq">F = C_F · p_c · A_t,   ṁ = p_c · A_t / c*,   I_sp = C_F · c* / g₀</div>
+        <p>With a 100 bar feed and an exit-to-throat area ratio of 8, the model gives a thrust coefficient of about 1.55 and a specific impulse near 67 s. A 13 kN nozzle needs a throat about 33 mm across.</p></div>
+      <div><h3>Ten nozzles, three jobs</h3><p>Tesla confirmed ten thrusters. This model splits them by job: two at the rear for acceleration, four under the floor for lift, and four at the corners to control pitch and roll. The Thrust trim ships with the two rear nozzles only; the invite-only Rocket trim gets the full set.</p></div>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Item</th><th>Value</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Number of thrusters (demo car)</td><td class="num">10</td><td><span class="tag k">Tesla</span></td></tr>
+          <tr><td>Compressed air tank volume</td><td class="num">600 L</td><td><span class="tag k">Tesla</span></td></tr>
+          <tr><td>Tank is rechargeable; electric actuators for in-flight adjustment</td><td class="num">yes</td><td><span class="tag k">Tesla</span></td></tr>
+          <tr><td>Rear diffuser fans, suction strong enough to hold the car upside down</td><td class="num">yes</td><td><span class="tag k">Tesla</span></td></tr>
+          <tr><td>0-60 mph, Thrust trim with 2 rear thrusters</td><td class="num">&lt; 1 s</td><td><span class="tag k">Tesla</span></td></tr>
+          <tr><td>Range / top speed</td><td class="num">300 mi / 230+ mph</td><td><span class="tag k">Tesla</span></td></tr>
+          <tr><td>Tank pressure</td><td class="num">310 bar</td><td><span class="tag a">Assumed</span></td></tr>
+          <tr><td>Car mass, empty tank</td><td class="num">1,900 kg</td><td><span class="tag a">Assumed</span></td></tr>
+          <tr><td>Regulator feed pressure, nozzle area ratio</td><td class="num">100 bar, 8</td><td><span class="tag a">Assumed</span></td></tr>
+          <tr><td>Layout 2 rear / 4 lift / 4 attitude; 13, 13, 5 kN each</td><td class="num">10 total</td><td><span class="tag a">Assumed</span></td></tr>
+          <tr><td>Tyre grip, motor power, drag area</td><td class="num">1.3, 950 kW, 0.55 m²</td><td><span class="tag a">Assumed</span></td></tr>
+          <tr><td>Sealed underbody area, skirt perimeter</td><td class="num">3 m², 11.6 m</td><td><span class="tag a">Assumed</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <div>An independent physics model built from public reporting. Not affiliated with Tesla or SpaceX. Model is 2D, ignores aerodynamic lift and suspension, and treats tank blowdown as adiabatic.</div>
+    <div>Sources:</div>
+    <ul>
+      <li><a href="https://virginiabusiness.com/tesla-roadster-spacex-thrusters-production-2028/" target="_blank" rel="noopener">Reuters via Virginia Business, Tesla's new Roadster turns in air with SpaceX thrusters (16 Oct 2026)</a></li>
+      <li><a href="https://theevreport.com/tesla-roadster-unveil-spacex-cold-gas-thrusters" target="_blank" rel="noopener">The EV Report, Roadster unveil: thruster count and 600 L tank</a></li>
+      <li><a href="https://www.trendingtopics.eu/tesla-spacex-roadster-cold-gas-thrusters-merger/" target="_blank" rel="noopener">Trending Topics, how the fans and thrusters work</a></li>
+      <li><a href="https://jalopnik.com/1847047575" target="_blank" rel="noopener">Jalopnik, earlier cold-gas thruster estimates</a></li>
+    </ul>
+  </footer>
+</div>
+<script src="physics.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
