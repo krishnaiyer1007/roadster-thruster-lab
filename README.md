@@ -2,6 +2,8 @@
 
 How does a car jump over five other cars, hover and drive upside down? On 15 October 2026 Tesla showed the new Roadster doing exactly that, using cold-gas thrusters developed with SpaceX and suction fans under the floor. This project rebuilds the physics from first principles, twice:
 
+**▶ Try it live: [krishnaiyer1007.github.io/roadster-thruster-lab](https://krishnaiyer1007.github.io/roadster-thruster-lab/)**
+
 1. **An interactive web model** you can play with in any browser. Change the tank pressure or the car's mass and watch every scenario re-run.
 2. **MATLAB and Simulink models** of the same system, with a Stateflow mission manager, a pitch control loop and a landing burn. They are cross-checked against the web model and agree to within about 1%.
 

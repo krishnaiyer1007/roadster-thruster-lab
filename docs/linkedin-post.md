@@ -16,7 +16,7 @@ What surprised me:
 
 Tesla hasn't published every number, so anything assumed is labelled. Try changing the tank pressure and watch the whole thing re-run.
 
-🔗 Live model: [GitHub Pages link]
-💻 Code: [GitHub repo link]
+🔗 Live model: https://krishnaiyer1007.github.io/roadster-thruster-lab/
+💻 Code: https://github.com/krishnaiyer1007/roadster-thruster-lab
 
 #Engineering #MATLAB #Simulink #ControlSystems #Tesla #SpaceX #Physics #Simulation
